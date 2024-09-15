@@ -18,7 +18,7 @@ python -m venv ocr_venv
 source ocr_venv/bin/activate
 pip install -r requirements.txt
 ```
-3. You might need manually install the Tesseract OCR engine if you don't have it. However, it is optional, since EasyOCR was used as a final version, and it surpassed Tesseract.
+3. You might need to manually install the Tesseract OCR engine if you don't have it. However, it is optional, since EasyOCR was used as a final version, and it surpassed Tesseract.
 ```Shell
 $ brew install tesseract
 ```
