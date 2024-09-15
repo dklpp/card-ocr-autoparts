@@ -1,4 +1,1 @@
-Mexico
-1C0 805 594
-6
-~PP-GF 40< PK3
+Mexico 1C0 805 594 6 ~PP-GF 40< PK3 

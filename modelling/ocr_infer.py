@@ -13,18 +13,21 @@ from typing import Literal
 
 class AutoPartImage(object):
     """
-    Preprocessing techniques of an image to be prepared for OCR inference.
+    Various preprocessing techniques of an image to be prepared for OCR inference.
     """
     def __init__(self, image):
         self.image = image
 
     def show(self):
+        """Show an image."""
         sv.plot_image(self.image)
 
     def image_array(self):
+        """Return 3d image array."""
         return self.image
 
     def deskew_image(self):
+        """Deskew an image if it was skewed/rotated."""
         imGray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY) # turn to gray
         imOTSU = cv2.threshold(imGray, 0, 1, cv2.THRESH_OTSU+cv2.THRESH_BINARY_INV)[1] # get threshold with positive pixels as text
         coords = np.column_stack(np.where(imOTSU > 0)) # get coordinates of positive pixels (text)
@@ -45,6 +48,7 @@ class AutoPartImage(object):
         return self
 
     def binarize(self):
+        """Binarize an image (convert BRG channels to Gray)"""
         self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY) 
         return self
 
@@ -118,6 +122,7 @@ class AutoPartImage(object):
         return self
     
     def dilate_morph(self, iters=1):
+        """Dilate an image with 2x2 kernel."""
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
         self.image = cv2.dilate(self.image, kernel, iterations=iters)
         return self
@@ -125,19 +130,23 @@ class AutoPartImage(object):
 
 
 class OCRinference(object):
+    """
+    Inferencing an image with OCR tools. Available 3 OCR models: EasyOCR, PyTesseract, KerasOCR.
+    """
     def __init__(self, orig_image, image, file_name, ocr_model: Literal['EasyOCR', 'Tesseract', 'KerasOCR'],
                  prob_thr=0.05, font_size=2, font_thickness=2, output_dir='output_image',
                  text_output_dir='output_text'):
         self.orig_image = orig_image
         self.image = image
         self.file_name = os.path.splitext(file_name)[0]
-        self.ocr_model = ocr_model
-        self.prob_thr = prob_thr
-        self.font_size, self.font_thinkness = font_size, font_thickness
+        self.ocr_model = ocr_model # chosen model
+        self.prob_thr = prob_thr # threshold for considering a predicted fragment
+        self.font_size, self.font_thinkness = font_size, font_thickness # parameters of pred text on an image
         self.output_dir = output_dir
         self.text_output_dir = text_output_dir
 
     def inference(self):
+        """Inferencing a chosen OCR model on an image."""
         if self.ocr_model == 'EasyOCR':
             img = self.EasyOCRinference()
             cv2.imwrite(f"../output/{self.output_dir}/{self.file_name}_{self.ocr_model}.jpg", img)
@@ -152,24 +161,21 @@ class OCRinference(object):
     def EasyOCRinference(self):
         reader = easyocr.Reader(['en'], gpu=True)
 
-        result = reader.readtext(self.image, detail=1, paragraph=False)
-
-        # Save a new image with boxes and text on it
-        #image_new = self.image.copy()
+        result = reader.readtext(self.image, detail=1, paragraph=False) # extract information from image with OCR
 
         with open(f"../output/{self.text_output_dir}/{self.file_name}_{self.ocr_model}.txt", "w") as f:
             for (coord, text, prob) in result:
-                if prob > self.prob_thr:
+                if prob > self.prob_thr: # probability threshold for considering a predicted text
                     (topleft, topright, bottomright, bottomleft) = coord 
                     tx, ty, bx, by = (int(topleft[0]), int(topleft[1]), int(bottomright[0]), int(bottomright[1]))
 
-                    f.write(text + " ")
+                    f.write(text + " ") # writes predicted text to a .txt file
 
-                    cv2.rectangle(self.orig_image, (tx, ty), (bx, by), (0, 0, 255), 2)
-                    cv2.putText(self.orig_image, text, (tx-40, ty-5), cv2.FONT_HERSHEY_SIMPLEX, 
+                    cv2.rectangle(self.orig_image, (tx, ty), (bx, by), (0, 0, 255), 2) # puts a bounding box over predicted text fragment 
+                    cv2.putText(self.orig_image, text, (tx-40, ty-5), cv2.FONT_HERSHEY_SIMPLEX, # writes predicted text on an image
                                 self.font_size, (0, 0, 255), self.font_thinkness)
 
-        sv.plot_image(self.orig_image)
+        sv.plot_image(self.orig_image) # plots an image with predicted bbox and text
 
         return self.orig_image
 
@@ -184,7 +190,7 @@ class OCRinference(object):
             extracted_text = ' '.join([item[0] for item in pred_groups[0]])
             f.write(extracted_text + " ")
 
-            keras_ocr.tools.drawAnnotations(image=self.image, predictions=pred_groups[0])
+            keras_ocr.tools.drawAnnotations(image=self.image, predictions=pred_groups[0]) # plots an image with predicted bbox and text
             plt.axis('off')
             plt.savefig(f"../output/{self.output_dir}/{self.file_name}_{self.ocr_model}.jpg", bbox_inches='tight', pad_inches=0)
             print("Image Saved.")
@@ -209,15 +215,15 @@ class OCRinference(object):
                 conf = int(results["conf"][i])# Extracting the confidence
 
                 #filtering the confidence
-                if conf > self.prob_thr:
+                if conf > self.prob_thr: # threshold for considering a prediction
 
                     text = "".join([c if ord(c) < 128 else "" for c in text]).strip()
                     if len(text) > 1:
-                        f.write(text + " ")
+                        f.write(text + " ") # writes text to a file
                         cv2.rectangle(self.orig_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
                         cv2.putText(self.orig_image, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
             
-        sv.plot_image(cv2.cvtColor(self.orig_image, cv2.COLOR_BGR2RGB))
+        sv.plot_image(cv2.cvtColor(self.orig_image, cv2.COLOR_BGR2RGB)) # plots an image with predicted bbox and text
 
 
         return self.orig_image
